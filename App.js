@@ -40,7 +40,7 @@ export default function App() {
 
   const [isMatchStarted, setIsMatchStarted] = useState(false);
   const [ipAddress, setIpAddress] = useState('');
-  const [player, setPlayer] = useState(['','']);
+  let player = (['','']);
   const [lastScorePlayer, setLastScorePlayer] = useState(-1);
 
   const [isFliped,setIsFliped] = useState(false);
@@ -92,14 +92,6 @@ export default function App() {
         }
         if (data.type === 'MATCH_UPDATE') {
             setMatchData(data.matchData); // Update match data state
-            setPlayer[0] = matchData.match_category.charAt(1).toLowerCase() != 'd'
-              ? matchData.team1_player1_name 
-              : (matchData.team1_player1_name.split(' ')[0] + ' & ' + matchData.team1_player2_name.split(' ')[0]);
-          
-            setPlayer[1] = matchData.match_category.charAt(1).toLowerCase() != 'd'
-            ? matchData.team2_player1_name 
-            : (matchData.team2_player1_name.split(' ')[0] + ' & ' + matchData.team2_player2_name.split(' ')[0]);
-      
         }
       };
   
@@ -109,7 +101,13 @@ export default function App() {
     }
   }, [ws]); // Add ws as dependency
   
-  
+  player[0] = matchData.match_category.charAt(1).toLowerCase() != 'd'
+    ? matchData.team1_player1_name 
+    : (matchData.team1_player1_name.split(' ')[0] + ' & ' + matchData.team1_player2_name.split(' ')[0]);
+
+  player[1] = matchData.match_category.charAt(1).toLowerCase() != 'd'
+    ? matchData.team2_player1_name 
+    : (matchData.team2_player1_name.split(' ')[0] + ' & ' + matchData.team2_player2_name.split(' ')[0]);
 
 
   const onclickFlip = () => {
@@ -170,7 +168,7 @@ export default function App() {
 
   function isValidIpAddress(ipAddress) {
     // Regular expression to match an IP address in the format xxx.xxx.xxx.xxx
-    const ipPattern = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    const ipPattern = /^(25|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
   
     if (ipAddress.match(ipPattern)) {
       return true; 
