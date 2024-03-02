@@ -1,35 +1,151 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, Button, TouchableOpacity, ImageBackground, TextInput, Modal } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-// import * as WebSocket from 'ws';
+import { Octicons } from '@expo/vector-icons';
+
+const initMatchData = {
+  userId: null,
+  tournament_name: '',
+  date: '',
+  time: '',
+
+  match_no: '',
+  match_category: '',
+  age_category: '',
+  game_point: 21,
+  interval_point: 11,
+  game_cap: 30,
+  num_of_sets: 3,
+  interval_time: 1,
+
+  team1_name: '',
+  team1_player1_name: '',
+  team1_player2_name: '',
+  team1_country: '',
+  team1_club: '',
+
+  team2_name: '',
+  team2_player1_name: '',
+  team2_player2_name: '',
+  team2_country: '',
+  team2_club: '',
+  
+  team_1_game_points_set_i: [0],
+  team_2_game_points_set_i: [0],
+  set_winner_i: [-1],
+  winner: -1
+}
 
 export default function App() {
 
-  const [isMatchStarted, setIsMatchStarted] = useState(true);
+  const [isMatchStarted, setIsMatchStarted] = useState(false);
   const [ipAddress, setIpAddress] = useState('');
-  const [player, setPlayer] = useState(['Geenath Pasindu','lakindu banneheka']);
+  const [player, setPlayer] = useState(['','']);
   const [lastScorePlayer, setLastScorePlayer] = useState(-1);
 
   const [isFliped,setIsFliped] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [ipAddressErr, setIpAddressErr] = useState(false);
+  const [ws, setWs] = useState(null); // Maintain WebSocket connection state
+  
+
+  
+  const [matchData, setMatchData] = useState(initMatchData);
+
+
+  // Function to establish WebSocket connection
+  useEffect(() => {
+    if (isValidIpAddress(ipAddress)) {
+      setIpAddressErr(false);
+      const socket = new WebSocket(`ws://${ipAddress}:8080`);
+      setWs(socket); // Store the WebSocket connection
+  
+      // Add event listeners for WebSocket connection
+      socket.addEventListener('open', () => {
+        console.log('WebSocket connection established.');
+      });
+  
+      socket.addEventListener('close', () => {
+        console.log('WebSocket connection closed.');
+      });
+  
+      socket.addEventListener('error', (error) => {
+        console.error('WebSocket error:', error);
+        setIpAddressErr(true);
+      });
+  
+      return () => {
+        socket.close();
+      };
+    } else {
+      setIpAddressErr(true);
+    }
+  }, [ipAddress]);
+  
+
+  useEffect(() => {
+    if (ws) {
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'MATCH_STATUS') {
+          setIsMatchStarted(data.isMatchOnGoing);
+        }
+        if (data.type === 'MATCH_UPDATE') {
+            setMatchData(data.matchData); // Update match data state
+            setPlayer[0] = matchData.match_category.charAt(1).toLowerCase() != 'd'
+              ? matchData.team1_player1_name 
+              : (matchData.team1_player1_name.split(' ')[0] + ' & ' + matchData.team1_player2_name.split(' ')[0]);
+          
+            setPlayer[1] = matchData.match_category.charAt(1).toLowerCase() != 'd'
+            ? matchData.team2_player1_name 
+            : (matchData.team2_player1_name.split(' ')[0] + ' & ' + matchData.team2_player2_name.split(' ')[0]);
+      
+        }
+      };
+  
+      return () => {
+        ws.close(); // Close WebSocket connection when component unmounts
+      };
+    }
+  }, [ws]); // Add ws as dependency
+  
+  
+
 
   const onclickFlip = () => {
     setIsFliped(!isFliped);
   }
   
   const onclickUndo = () => {
-    // decriment the score of player_id
-    console.log('-1 from player ',lastScorePlayer)
+    if (!ws) return; // Check if WebSocket connection exists
+    
+    const data = {
+      type: 'SCORE_UPDATE_MOBILE',
+      value: {
+        team: lastScorePlayer,
+        value: -1
+      }
+    };
+  
+    ws.send(JSON.stringify(data)); 
     setLastScorePlayer(-1);
-
   }
-  const increaseScore = (player) => {
-    // incriment the score of player_id
-    console.log('add +1 to player ', player)
-    setLastScorePlayer(player)
+  const increaseScore = (team) => {
+    if (!ws) return; // Check if WebSocket connection exists
+    
+    const data = {
+      type: 'SCORE_UPDATE_MOBILE',
+      value: {
+        team: team,
+        value: +1
+      }
+    };
+  
+    ws.send(JSON.stringify(data)); 
+    setLastScorePlayer(team);
   };
 
 
-  const [modalVisible, setModalVisible] = useState(false);
 
   const openModal = () => {
     setModalVisible(true);
@@ -41,8 +157,27 @@ export default function App() {
 
   const handleTextChange = (newText) => {
     setIpAddress(newText);
-    // You can perform additional logic here if needed
   };
+
+  const handleAddIpBtn = () => {
+    if (isValidIpAddress(ipAddress)) {
+      setIpAddressErr(false);
+    } else {
+      setIpAddressErr(true);
+    }
+    closeModal();
+  }
+
+  function isValidIpAddress(ipAddress) {
+    // Regular expression to match an IP address in the format xxx.xxx.xxx.xxx
+    const ipPattern = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+  
+    if (ipAddress.match(ipPattern)) {
+      return true; 
+    } else {
+      return false;
+    }
+  }
 
   return (
     <ImageBackground
@@ -51,7 +186,7 @@ export default function App() {
     >
       <View style={styles.container}>
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={[styles.button1,{backgroundColor: `${isFliped?'red':'blue'}`}]} onPress={() => increaseScore(isFliped?0:1)}>
+          <TouchableOpacity style={[styles.button1,{backgroundColor: `${isFliped?'#D21F1F':'#2A42BE'}`}]} onPress={() => increaseScore(isFliped?1:2)}>
             <Text style={styles.buttonText}>+1</Text>
           </TouchableOpacity>
           <View style={styles.centerBox} >
@@ -60,7 +195,14 @@ export default function App() {
             <TouchableOpacity 
               onPress={openModal}
             >
-              <Text style={styles.textBox1}>{ipAddress != '' ?ipAddress :'Add IP'}</Text>
+              <View style={styles.textBox1} >
+                <Text style={{paddingLeft:10}} >
+                  <Octicons name="dot-fill" size={20} color={ipAddressErr?'red':'green'} />
+                </Text>
+                <Text style={styles.ipText} >
+                  {ipAddress != '' ?ipAddress :'Add IP'}
+                </Text>
+              </View>
             </TouchableOpacity>
 
             <Modal
@@ -79,7 +221,7 @@ export default function App() {
                     placeholder="Enter IP Address"
                     keyboardType="numeric"
                   />
-                  <Button title="Add" onPress={closeModal} />
+                  <Button title="Add" onPress={handleAddIpBtn} />
                 </View>
               </View>
             </Modal>
@@ -113,7 +255,7 @@ export default function App() {
             </View>
             
           </View>
-          <TouchableOpacity style={[styles.button2,{backgroundColor: `${!isFliped?'red':'blue'}`}]} onPress={() => increaseScore(!isFliped?0:1)}>
+          <TouchableOpacity style={[styles.button2,{backgroundColor: `${!isFliped?'#D21F1F':'#2A42BE'}`}]} onPress={() => increaseScore(!isFliped?1:2)}>
             <Text style={styles.buttonText}>+1</Text>
           </TouchableOpacity>
         </View>
@@ -121,7 +263,7 @@ export default function App() {
         <Modal
           animationType="slide"
           transparent={true}
-          visible={isMatchStarted}
+          visible={!isMatchStarted}
         >
           <View style={styles.modalContainer}>
             <View style={[styles.modalContent, {transform: [{ rotate: '90deg' }], justifyContent: 'space-around' }]}>
@@ -215,8 +357,9 @@ const styles = StyleSheet.create({
   },
   textBox1: {
     display: 'flex', 
-    justifyContent: 'center',
+    justifyContent: 'space-around',
     alignItems: 'center', 
+    flexDirection: 'row', 
 
     color: 'white',
     fontSize: 16,
@@ -226,10 +369,15 @@ const styles = StyleSheet.create({
     borderColor: '#FFF',
     borderWidth: 1,
     borderRadius: 15,
-    paddingHorizontal: 15,
+    paddingHorizontal: 5,
     backgroundColor: 'rgba(63, 54, 54, 0.6)',
   },
-
+  ipText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    paddingHorizontal: 15,
+  },
   player1Text: {
     color: 'white',
     width: 'auto',
@@ -241,7 +389,7 @@ const styles = StyleSheet.create({
     width: 300,
     borderWidth: 1,
     borderRadius: 15,
-    paddingHorizontal: 15,
+    paddingHorizontal: 10,
     backgroundColor: 'rgba(63, 54, 54, 0.6)',
     textAlign: 'center'
   },
